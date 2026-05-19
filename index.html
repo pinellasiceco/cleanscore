@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CleanScore — Pinellas Restaurant Compliance</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{--red:#C0392B;--red-dark:#96281B;--red-light:#FADBD8;--bg-dark:#1A0A09;--green:#27AE60;--amber:#E67E22;--gray-light:#F8F9FA;--gray-border:#E9ECEF;--gray-text:#6C757D;--text-dark:#1A1A1A;--text-med:#4A4A4A;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--gray-light);color:var(--text-dark);}
+.hdr{background:var(--bg-dark);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+.hdr-logo{font-size:20px;font-weight:800;color:var(--red);letter-spacing:-.5px;}
+.hdr-sub{font-size:11px;color:#888;text-align:right;line-height:1.4;}
+.page{padding-bottom:140px;}
+.card{background:#fff;border-radius:12px;margin:12px 16px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+.biz-name{font-size:19px;font-weight:700;margin-bottom:4px;}
+.biz-addr{font-size:14px;color:var(--gray-text);margin-bottom:3px;}
+.biz-insp{font-size:13px;color:var(--gray-text);}
+.score-hero{border-radius:12px;margin:12px 16px;padding:26px 20px 22px;text-align:center;color:#fff;}
+.score-num{font-size:76px;font-weight:800;line-height:1;margin-bottom:6px;}
+.score-lbl{font-size:15px;font-weight:700;letter-spacing:1px;margin-bottom:4px;}
+.score-sub{font-size:13px;opacity:.85;margin-bottom:14px;}
+.score-bar-bg{height:10px;border-radius:8px;background:rgba(255,255,255,.25);max-width:280px;margin:0 auto;overflow:hidden;}
+.score-bar-fill{height:100%;border-radius:8px;background:rgba(255,255,255,.8);}
+.score-counts{margin-top:12px;font-size:13px;opacity:.9;}
+.sec-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--gray-text);margin:18px 16px 6px;}
+.insp-date{font-weight:600;margin-bottom:6px;}
+.insp-disp{font-size:14px;color:var(--gray-text);margin-bottom:10px;}
+.cb-warn{background:#FFF3E0;border:1px solid #FFB74D;border-radius:8px;padding:12px;}
+.cb-warn-ttl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#E65100;margin-bottom:4px;}
+.cb-warn-txt{font-size:13px;color:var(--text-med);line-height:1.5;}
+.vcard{background:#fff;border-radius:12px;margin:10px 16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+.vcard-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;min-height:56px;-webkit-tap-highlight-color:transparent;}
+.vcard-hdr-l{display:flex;align-items:center;gap:10px;}
+.v-icon{font-size:20px;}
+.v-name{font-size:14px;font-weight:700;}
+.vcard-hdr-r{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.v-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:.5px;white-space:nowrap;}
+.badge-high{background:var(--red-light);color:var(--red);}
+.badge-major{background:#FDEBD0;color:var(--amber);}
+.badge-basic{background:#F2F3F4;color:#626567;}
+.v-chev{font-size:11px;color:var(--gray-text);transition:transform .2s;margin-left:2px;}
+.v-chev.open{transform:rotate(180deg);}
+.pbox{background:#FFF5F5;border:1px solid var(--red-light);border-radius:10px;padding:14px;margin:0 16px 4px;}
+.pbox-hdr{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--red);margin-bottom:6px;}
+.pbox-name{font-size:15px;font-weight:700;margin-bottom:2px;}
+.pbox-desc{font-size:12px;color:var(--gray-text);margin-bottom:6px;}
+.pbox-verified{font-size:11px;color:var(--green);font-weight:600;margin-bottom:8px;}
+.btn-call{display:block;width:100%;padding:12px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;text-decoration:none;text-align:center;min-height:44px;cursor:pointer;}
+.vcard-body{display:none;padding:0 16px 16px;}
+.vcard-body.open{display:block;}
+.v-flags{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}
+.v-flag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;}
+.flag-cos{background:#D5F5E3;color:var(--green);}
+.flag-rep{background:var(--red-light);color:var(--red);}
+.v-sec{margin-bottom:14px;}
+.v-sec-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--gray-text);margin-bottom:5px;}
+.v-sec-txt{font-size:13px;line-height:1.55;color:var(--text-med);}
+.v-obs{font-size:13px;font-style:italic;background:#FFF5F5;padding:10px 12px;border-radius:8px;border-left:3px solid var(--gray-border);line-height:1.5;color:var(--text-dark);}
+.stats-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px 4px;}
+.stat-card{background:#fff;border-radius:10px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+.stat-num{font-size:26px;font-weight:800;color:var(--red);}
+.stat-lbl{font-size:11px;color:var(--gray-text);line-height:1.4;margin-top:4px;}
+.stat-note{font-size:12px;color:var(--gray-text);line-height:1.5;margin:8px 16px 4px;font-style:italic;}
+.tl-card{background:#fff;border-radius:12px;margin:12px 16px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+.tl-row{display:flex;align-items:flex-start;gap:14px;position:relative;}
+.tl-row:not(:last-child){padding-bottom:20px;}
+.tl-row:not(:last-child)::after{content:'';position:absolute;left:13px;top:28px;width:2px;bottom:0;background:var(--gray-border);}
+.tl-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.dot-red{background:var(--red-light);color:var(--red);}
+.dot-amber{background:#FDEBD0;color:var(--amber);}
+.dot-gray{background:var(--gray-border);color:var(--gray-text);}
+.tl-step{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gray-text);}
+.tl-desc{font-size:14px;font-weight:600;color:var(--text-dark);margin-top:1px;}
+.tl-note{font-size:12px;color:var(--gray-text);margin-top:2px;line-height:1.4;}
+.cta-footer{position:fixed;bottom:0;left:0;right:0;background:var(--bg-dark);padding:14px 16px;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));box-shadow:0 -4px 20px rgba(0,0,0,.35);z-index:100;}
+.cta-hl{font-size:13px;color:#bbb;text-align:center;margin-bottom:10px;}
+.cta-btns{display:flex;gap:8px;}
+.btn-cta-p{flex:1;padding:13px 8px;background:var(--red);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;text-decoration:none;text-align:center;display:flex;align-items:center;justify-content:center;min-height:44px;}
+.btn-cta-s{flex:1;padding:13px 8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:10px;font-size:13px;font-weight:600;text-decoration:none;text-align:center;display:flex;align-items:center;justify-content:center;min-height:44px;}
+.search-pg{min-height:calc(100vh - 48px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;text-align:center;}
+.search-logo{font-size:44px;font-weight:900;color:var(--red);letter-spacing:-1px;margin-bottom:6px;}
+.search-tag{font-size:17px;color:var(--text-med);margin-bottom:28px;}
+.search-form{width:100%;max-width:380px;}
+.search-inp{width:100%;padding:14px 16px;font-size:16px;border:2px solid var(--gray-border);border-radius:12px;outline:none;margin-bottom:10px;min-height:44px;-webkit-appearance:none;background:#fff;color:var(--text-dark);}
+.search-inp:focus{border-color:var(--red);}
+.btn-go{width:100%;padding:14px;background:var(--red);color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;min-height:44px;}
+.search-powered{font-size:12px;color:var(--gray-text);margin-top:20px;}
+.search-results{width:100%;max-width:380px;margin-top:14px;text-align:left;}
+.sr-item{background:#fff;border-radius:10px;padding:14px;margin-bottom:8px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.08);display:flex;align-items:center;justify-content:space-between;min-height:44px;}
+.sr-name{font-size:14px;font-weight:600;}
+.sr-city{font-size:12px;color:var(--gray-text);margin-top:2px;}
+.sr-arr{color:var(--gray-text);font-size:18px;}
+.search-none{font-size:14px;color:var(--gray-text);margin-top:10px;}
+.state-pg{padding:60px 24px;text-align:center;}
+.state-icon{font-size:48px;margin-bottom:14px;}
+.state-ttl{font-size:21px;font-weight:700;margin-bottom:10px;}
+.state-txt{font-size:15px;color:var(--text-med);line-height:1.6;margin-bottom:20px;}
+.state-list{text-align:left;display:inline-block;font-size:14px;color:var(--gray-text);line-height:2;margin-bottom:20px;}
+.btn-link{display:inline-block;padding:12px 24px;background:var(--red);color:#fff;border-radius:10px;text-decoration:none;font-weight:600;font-size:15px;border:none;cursor:pointer;}
+.loading-pg{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
+.loading-logo{font-size:30px;font-weight:800;color:var(--red);}
+.loading-txt{font-size:15px;color:var(--gray-text);}
+</style>
+</head>
+<body>
+<div id="hdr"></div>
+<main id="main"></main>
+<div id="cta"></div>
+<script>
+// ── Supabase ──────────────────────────────────────────────────────────────
+var CS_SUPABASE_URL='https://kbyqatbkqqhuasbjlcwe.supabase.co';
+var CS_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtieXFhdGJrcXFodWFzYmpsY3dlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMTQxMzcsImV4cCI6MjA5Mjc5MDEzN30.9JGGiFV_elkQo_AjBjf-ssmeHQP6TI_AxDrMeHUtP4M';
+var csDb=null;
+try{csDb=supabase.createClient(CS_SUPABASE_URL,CS_ANON_KEY);}catch(e){console.error('Supabase init:',e);}
+
+// ── Data endpoints ────────────────────────────────────────────────────────
+var VIOLATIONS_URL='https://kbyqatbkqqhuasbjlcwe.supabase.co/storage/v1/object/public/cleanscore/cleanscore_violations.json';
+var PARTNERS_URL='https://kbyqatbkqqhuasbjlcwe.supabase.co/storage/v1/object/public/cleanscore/cleanscore_partners.json';
+var PINELLAS_ICE_CO={name:'Pinellas Ice Co',type:'ice',phone:'7278556873',city:'Clearwater',description:'Ice Machine Cleaning & Sanitizing',verified:true};
+var CATEGORY_PARTNER_TYPE={ice_machine:'ice',pest:'pest',hood:'hood',equipment:'refrig',temperature:'refrig'};
+var SOP={
+  ice_machine:{icon:'🧊',label:'Ice Machine Sanitation',
+    what_it_means:'Florida classifies ice as a food product. This violation means the machine producing ice for your customers contains mold, biofilm, scale, or bacterial contamination. It is one of the most common violations in Pinellas County and one of the most likely to trigger a callback inspection.',
+    remedy:'Professional deep clean with ATP luminometer testing. A certified technician disassembles the machine, removes scale and biofilm from evaporator plates, water distribution tray, spray bar, and ice bin. Pre and post-cleaning ATP readings document the result. Target: ATP reading below 10 RLU after cleaning.',
+    documentation:'ATP compliance report showing pre and post readings, dated and signed by the service technician.'},
+  temperature:{icon:'🌡️',label:'Temperature Control',
+    what_it_means:'Food held at improper temperatures creates conditions for rapid bacterial growth. Hot food must stay above 135°F and cold food must stay below 41°F. This is a High Priority violation because it directly causes foodborne illness.',
+    remedy:'Verify refrigeration and hot-holding equipment maintains correct temperatures — calibrate or repair as needed. Implement temperature logging every 2 hours for all TCS foods. Retrain all food handlers on the temperature danger zone (41°F–135°F) and proper cooling procedures.',
+    documentation:'Temperature logs showing corrected procedures. Equipment service record if repair was required.'},
+  hand_washing:{icon:'🤲',label:'Hand Washing / Employee Hygiene',
+    what_it_means:'Hand washing violations are among the most frequently cited in Florida. Inspectors look for accessible hand wash sinks, proper technique, and hair restraints in food preparation areas.',
+    remedy:'Verify every hand wash sink is accessible, stocked with soap, and has paper towels. Post hand washing procedure signs at every sink. Conduct a staff training refresher on when and how to wash hands. Enforce hair restraints for all employees handling open food.',
+    documentation:'Staff training sign-off sheet showing all employees completed refresher training with date and signatures.'},
+  food_storage:{icon:'📦',label:'Food Storage',
+    what_it_means:'Food storage violations cover how food is organized, labeled, and protected. The most serious is raw animal food stored above ready-to-eat food — a direct cross-contamination risk.',
+    remedy:'Organize cooler using the cook temperature hierarchy — bottom to top: raw beef/pork (bottom), raw ground meat, raw poultry, cooked and ready-to-eat food (top). Label all shelves. Implement FIFO date marking on all opened ready-to-eat TCS foods.',
+    documentation:'Updated food storage policy and staff training sign-off.'},
+  food_contact:{icon:'🔪',label:'Food Contact Surfaces',
+    what_it_means:'Any surface that contacts food must be cleaned and sanitized regularly. Soiled cutting boards, can openers, slicers, and prep surfaces harbor bacteria and are frequently cited.',
+    remedy:'Clean and sanitize all food contact surfaces at least every 4 hours during continuous use. Replace cutting boards with deep cuts. Verify sanitizing solution at proper concentration (chlorine 50–200 ppm or quaternary ammonium 200–400 ppm).',
+    documentation:'Updated cleaning schedule showing food contact surfaces, frequency, and responsible staff.'},
+  pest:{icon:'🐀',label:'Pest Activity',
+    what_it_means:'Pest activity is a High Priority violation that can result in emergency closure in severe cases. Evidence includes droppings, gnaw marks, live insects, or nesting materials.',
+    remedy:'Contact a licensed pest control operator immediately — active infestations cannot be resolved in-house. A licensed PCO will identify entry points, treat the infestation, and provide documentation. Seal gaps around pipes and doors, eliminate standing water, ensure dumpsters are sealed.',
+    documentation:'Pest control service record from a licensed PCO showing date of service, methods used, and technician license number.'},
+  hood:{icon:'🔥',label:'Hood / Ventilation',
+    what_it_means:'Hood violations indicate grease accumulation in exhaust systems — both a health violation and a fire hazard. Florida requires regular professional hood cleaning with frequency based on cooking volume.',
+    remedy:'Professional hood cleaning by a licensed contractor covering exhaust fans, ductwork, filters, and the hood itself. Staff can clean filters in-house regularly but full system cleaning requires a licensed contractor.',
+    documentation:'Hood cleaning certificate from a licensed contractor showing date, scope of work, and technician/company information.'},
+  employee_training:{icon:'📋',label:'Employee Training / Certification',
+    what_it_means:'Florida requires at least one certified food protection manager per establishment. If certification has expired or the certified manager was not present during inspection, this violation is cited.',
+    remedy:'Enroll in a Florida-approved food manager certification program (ServSafe or equivalent). Training is available online for $15–$150. Certification is valid for 5 years. Maintain training records on-site in a binder.',
+    documentation:'Food protection manager certificate and employee training records with completion dates and signatures.'},
+  plumbing:{icon:'🚿',label:'Plumbing',
+    what_it_means:'Plumbing violations range from minor (missing paper towels) to serious (sewage backup or no hot water). No running water or sewage backup can result in immediate emergency closure.',
+    remedy:'Supply and accessibility issues: resolve in-house immediately. Equipment failures (no hot water, drain backup): contact a licensed plumber. Do not operate if sewage is backing up or hot water is unavailable.',
+    documentation:'Plumber service record for equipment repairs. Photo showing corrected condition for supply issues.'},
+  equipment:{icon:'❄️',label:'Equipment Condition',
+    what_it_means:'Equipment violations cover refrigeration units with ice buildup, damaged door gaskets, or equipment not functioning correctly. Ice buildup indicates a potential seal or defrost failure.',
+    remedy:'Minor issues (dirty gaskets, debris): in-house cleaning and maintenance. Equipment failures (not maintaining temperature, excessive ice buildup): contact a commercial refrigeration technician.',
+    documentation:'Service record for equipment repair. Photo showing corrected condition for maintenance issues.'},
+  premises:{icon:'🧹',label:'General Sanitation',
+    what_it_means:'General sanitation violations cover cleanliness of non-food-contact surfaces — floors, walls, ceilings, equipment exteriors. These accumulate quickly and signal to inspectors that cleaning standards are generally low.',
+    remedy:'Implement a structured daily and weekly cleaning schedule covering all kitchen areas. Assign specific tasks to specific staff. Use a cleaning log that supervisors sign off daily. Deep clean areas cited in the inspection immediately.',
+    documentation:'Updated cleaning schedule and photos showing corrected condition.'},
+  other:{icon:'⚠️',label:'Other Violation',
+    what_it_means:'This violation requires review of the official DBPR inspection report for full details.',
+    remedy:'Review the specific violation language in your inspection report and consult with a food safety professional if needed.',
+    documentation:'Document the corrective action taken with photos or service records as appropriate.'}
+};
+
+// ── Global state ──────────────────────────────────────────────────────────
+var currentBusiness=null;
+var _actions=[];
+var _violations=[];
+var _partners=[];
+var _pendingFiles=[];
+
+// ── Utilities ─────────────────────────────────────────────────────────────
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtPhone(p){var d=String(p||'').replace(/\D/g,'');return d.length===10?'('+d.slice(0,3)+') '+d.slice(3,6)+'-'+d.slice(6):p||'';}
+function fmtDate(s){if(!s)return '';try{var d=new Date(s+'T12:00:00Z');return d.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});}catch(e){return s;}}
+function scoreLabel(s){return s>=80?'GOOD':s>=60?'NEEDS ATTENTION':'AT RISK';}
+function scoreColor(s){return s>=80?'#27AE60':s>=60?'#E67E22':'#C0392B';}
+function getPartners(cat,all){var pt=CATEGORY_PARTNER_TYPE[cat];if(!pt)return[];return(all||[]).filter(function(p){return p.type&&p.type.toLowerCase().includes(pt);}).sort(function(a,b){return(b.fit_score||0)-(a.fit_score||0);}).slice(0,2);}
+function getBusinessId(biz){var p=new URLSearchParams(window.location.search);return p.get('id')||p.get('license')||(biz?String(biz.id||biz.license||''):'');}
+
+function calcScoreWithActions(biz,actions){
+  var s=100;
+  (biz.violations||[]).forEach(function(v,i){
+    if(v.corrected_on_site)return;
+    if((actions||[]).some(function(a){return a.violation_index===i;}))return;
+    if(v.severity==='high')s-=15;
+    else if(v.severity==='major')s-=10;
+    else s-=5;
+    if(v.repeat)s-=5;
+  });
+  return Math.max(0,Math.min(100,s));
+}
+
+function showToast(msg){
+  var ex=document.getElementById('cs-toast');if(ex)ex.remove();
+  var t=document.createElement('div');t.id='cs-toast';
+  t.style.cssText='position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));left:50%;'
+    +'transform:translateX(-50%);background:#1A0A09;color:#fff;padding:10px 20px;'
+    +'border-radius:20px;font-size:14px;font-weight:600;z-index:9999;white-space:nowrap;'
+    +'font-family:-apple-system,sans-serif';
+  t.textContent=msg;document.body.appendChild(t);
+  setTimeout(function(){if(t.parentNode)t.remove();},2500);
+}
+
+// ── Supabase data ─────────────────────────────────────────────────────────
+async function loadActionsForBusiness(businessId){
+  if(!csDb||!businessId)return[];
+  try{
+    var r=await csDb.from('cs_actions').select('*').eq('business_id',businessId);
+    return r.data||[];
+  }catch(e){console.error('loadActions:',e);return[];}
+}
+
+async function loadActionsByToken(token){
+  if(!csDb||!token)return[];
+  try{
+    var r=await csDb.from('cs_actions').select('*').eq('share_token',token);
+    return r.data||[];
+  }catch(e){console.error('loadByToken:',e);return[];}
+}
+
+// ── Rendering helpers ─────────────────────────────────────────────────────
+function toggleCard(idx){var b=document.getElementById('vb-'+idx),c=document.getElementById('vc-'+idx);if(!b)return;var o=b.classList.toggle('open');if(c)c.classList.toggle('open',o);}
+function renderHeader(){document.getElementById('hdr').innerHTML='<header class="hdr"><div class="hdr-logo">CleanScore</div><div class="hdr-sub">Powered by<br>Pinellas Ice Co</div></header>';}
+function pboxHtml(p,verified){var ph=fmtPhone(p.phone);return '<div class="pbox"><div class="pbox-hdr">🔧 Recommended Provider</div><div class="pbox-name">'+esc(p.name)+'</div><div class="pbox-desc">'+esc(p.description||p.city||'')+'</div>'+(verified?'<div class="pbox-verified">✓ Verified Partner</div>':'')+(p.phone?'<a href="tel:'+esc(p.phone)+'" class="btn-call">📞 Call '+esc(ph)+'</a>':'')+'</div>';}
+
+function scoreHeroHtml(score){
+  var sc=scoreColor(score);
+  var viols=currentBusiness?(currentBusiness.violations||[]):[];
+  var open=viols.filter(function(v){return !v.corrected_on_site;});
+  var rpt=open.filter(function(v){return v.repeat;});
+  return '<div class="score-hero" style="background:'+sc+'">'
+    +'<div class="score-num">'+score+'</div>'
+    +'<div class="score-lbl">'+scoreLabel(score)+'</div>'
+    +'<div class="score-sub">CleanScore out of 100</div>'
+    +'<div class="score-bar-bg"><div class="score-bar-fill" style="width:'+score+'%"></div></div>'
+    +'<div class="score-counts">'+open.length+' open violation'+(open.length!==1?'s':'')
+    +(rpt.length?' · '+rpt.length+' repeat':'')+'</div>'
+    +'</div>';
+}
+
+function shareBtnHtml(){
+  if(!_actions.length)return'';
+  return'<div style="padding:0 16px 16px">'
+    +'<button id="share-btn"'
+    +' ontouchend="event.preventDefault();openShareFlow()"'
+    +' onclick="openShareFlow()"'
+    +' style="width:100%;padding:14px;background:#1A0A09;color:#fff;border:none;'
+    +'border-radius:10px;font-size:15px;font-weight:600;font-family:inherit;'
+    +'cursor:pointer;touch-action:manipulation">'
+    +'📋 Generate Inspector Report</button></div>';
+}
+
+function renderViolations(){
+  var el=document.getElementById('viols-section');
+  if(!el||!currentBusiness)return;
+  el.innerHTML=(currentBusiness.violations||[]).map(function(v,i){return violCardHtml(v,i,_partners,_actions);}).join('');
+}
+
+function updateScoreDisplay(){
+  if(!currentBusiness)return;
+  var score=calcScoreWithActions(currentBusiness,_actions);
+  var el=document.getElementById('score-hero-wrap');
+  if(el)el.innerHTML=scoreHeroHtml(score);
+  var sa=document.getElementById('share-area');
+  if(sa)sa.innerHTML=shareBtnHtml();
+}
+
+function violCardHtml(v,idx,allP,actions){
+  var act=(actions||_actions).find(function(a){return a.violation_index===idx;});
+  var sop=SOP[v.category]||SOP.other;
+  var bc=act?'#27AE60':(v.severity==='high'?'#C0392B':v.severity==='major'?'#E67E22':'#95A5A6');
+  var bclass=v.severity==='high'?'badge-high':v.severity==='major'?'badge-major':'badge-basic';
+  var blabel=v.severity==='high'?'HIGH PRIORITY':v.severity==='major'?'MAJOR':'BASIC';
+  var flags='';
+  if(v.corrected_on_site)flags+='<span class="v-flag flag-cos">✓ Corrected On-Site</span>';
+  if(v.repeat)flags+='<span class="v-flag flag-rep">⚠ Repeat</span>';
+  var pb='';
+  if(v.category==='ice_machine'){pb=pboxHtml(PINELLAS_ICE_CO,true);}
+  else if(CATEGORY_PARTNER_TYPE[v.category]){var m=getPartners(v.category,allP);if(m.length)pb=pboxHtml(m[0],false);}
+  var actionState;
+  if(act){
+    actionState='<div style="background:#D5F5E3;border:1px solid #27AE60;border-radius:8px;'
+      +'padding:12px;margin-top:12px">'
+      +'<div style="font-size:12px;font-weight:700;color:#1E8449;margin-bottom:4px">✅ Action Logged</div>'
+      +'<div style="font-size:13px;color:#1E8449">'+esc(act.action_text.slice(0,100)+(act.action_text.length>100?'...':''))+'</div>'
+      +'<div style="font-size:11px;color:#27AE60;margin-top:4px">'+esc(act.action_date)+'</div>'
+      +(act.doc_urls&&act.doc_urls.length?'<div style="font-size:11px;color:#27AE60;margin-top:2px">📎 '+act.doc_urls.length+' document(s) attached</div>':'')
+      +'</div>'
+      +'<button data-eidx="'+idx+'" data-ecat="'+esc(v.category)+'"'
+      +' ontouchend="event.preventDefault();openActionLog(parseInt(this.dataset.eidx),this.dataset.ecat)"'
+      +' onclick="openActionLog(parseInt(this.dataset.eidx),this.dataset.ecat)"'
+      +' style="width:100%;padding:10px;background:#fff;border:1px solid #27AE60;'
+      +'color:#27AE60;border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;'
+      +'cursor:pointer;touch-action:manipulation;margin-top:8px">Edit action</button>';
+  }else{
+    actionState='<button data-vidx="'+idx+'" data-vcat="'+esc(v.category)+'"'
+      +' ontouchend="event.preventDefault();openActionLog(parseInt(this.dataset.vidx),this.dataset.vcat)"'
+      +' onclick="openActionLog(parseInt(this.dataset.vidx),this.dataset.vcat)"'
+      +' style="width:100%;padding:12px;background:#C0392B;color:#fff;border:none;'
+      +'border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;'
+      +'touch-action:manipulation;margin-top:12px">✓ Log action taken</button>';
+  }
+  return'<div class="vcard" style="border-left:4px solid '+bc+'">'
+    +'<div class="vcard-hdr" onclick="toggleCard('+idx+')">'
+    +'<div class="vcard-hdr-l"><span class="v-icon">'+sop.icon+'</span><span class="v-name">'+esc(sop.label)+'</span></div>'
+    +'<div class="vcard-hdr-r"><span class="v-badge '+bclass+'">'+blabel+'</span>'
+    +(act?'<span style="font-size:16px">✅</span>':'')
+    +'<span class="v-chev" id="vc-'+idx+'">▼</span></div>'
+    +'</div>'
+    +(pb?pb:'')
+    +'<div class="vcard-body" id="vb-'+idx+'">'
+    +(flags?'<div class="v-flags">'+flags+'</div>':'')
+    +'<div class="v-sec"><div class="v-sec-lbl">What the inspector found</div><div class="v-obs">'+esc(v.text)+'</div></div>'
+    +'<div class="v-sec"><div class="v-sec-lbl">What this means</div><div class="v-sec-txt">'+esc(sop.what_it_means)+'</div></div>'
+    +'<div class="v-sec"><div class="v-sec-lbl">Recommended remedy</div><div class="v-sec-txt">'+esc(sop.remedy)+'</div></div>'
+    +'<div class="v-sec"><div class="v-sec-lbl">Documentation needed</div><div class="v-sec-txt">'+esc(sop.documentation)+'</div></div>'
+    +actionState
+    +'</div>'
+    +'</div>';
+}
+
+function countyHtml(biz,score){
+  var cs=biz.county_stats||{};
+  var pct=Math.round((cs.pct_with_any_violation||0)*100)+'%';
+  var avg=Math.max(0,Math.min(100,Math.round(100-(cs.avg_violations_county||0)*8)));
+  var sc=score>=avg?'#27AE60':'#C0392B';
+  var hasIce=(biz.violations||[]).some(function(v){return v.category==='ice_machine';});
+  return'<div class="sec-lbl">Pinellas County Context</div>'
+    +'<div class="stats-row">'
+    +'<div class="stat-card"><div class="stat-num">'+pct+'</div><div class="stat-lbl">of Pinellas restaurants had violations at last inspection</div></div>'
+    +'<div class="stat-card"><div class="stat-num" style="color:'+sc+'">'+score+'</div><div class="stat-lbl">your score · county avg: '+avg+'</div></div>'
+    +'</div>'
+    +(hasIce?'<div class="stat-note">46.8% of restaurants that receive an ice machine violation are cited again. Regular professional maintenance is the only way to break the cycle.</div>':'');
+}
+
+function timelineHtml(biz){
+  var d=(biz.last_inspection_disposition||'').toLowerCase();
+  var iw=d.includes('warning'),ia=d.includes('administrative')||d.includes('complaint');
+  if(iw){return'<div class="sec-lbl">What Happens Next</div><div class="tl-card"><div class="tl-row"><div class="tl-dot dot-red">!</div><div><div class="tl-step">Today</div><div class="tl-desc">Violations cited — Warning Issued</div><div class="tl-note">Inspection report filed with DBPR</div></div></div><div class="tl-row"><div class="tl-dot dot-amber">→</div><div><div class="tl-step">In 14–21 days</div><div class="tl-desc">Callback Inspection</div><div class="tl-note">Inspector returns to verify violations are corrected</div></div></div><div class="tl-row"><div class="tl-dot dot-red">✕</div><div><div class="tl-step">If unresolved</div><div class="tl-desc">Administrative Complaint + potential fines</div><div class="tl-note">May lead to license suspension or emergency closure</div></div></div></div>';}
+  if(ia){return'<div class="sec-lbl">What Happens Next</div><div class="tl-card"><div class="tl-row"><div class="tl-dot dot-red">!</div><div><div class="tl-step">Current Status</div><div class="tl-desc">Administrative Complaint Filed</div><div class="tl-note">DBPR has escalated — legal proceedings may follow</div></div></div><div class="tl-row"><div class="tl-dot dot-red">→</div><div><div class="tl-step">Next Step</div><div class="tl-desc">Formal hearing or settlement offer</div><div class="tl-note">Correct all violations immediately — document everything</div></div></div></div>';}
+  return'<div class="sec-lbl">What Happens Next</div><div class="tl-card"><div class="tl-row"><div class="tl-dot dot-amber">→</div><div><div class="tl-step">Next Step</div><div class="tl-desc">Correct all cited violations</div><div class="tl-note">Document corrective actions in case of follow-up</div></div></div><div class="tl-row"><div class="tl-dot dot-gray">→</div><div><div class="tl-step">Upcoming</div><div class="tl-desc">Next routine inspection</div><div class="tl-note">Typically every 6–12 months depending on risk level</div></div></div></div>';
+}
+
+function renderCTA(biz){
+  var hasIce=(biz.violations||[]).some(function(v){return v.category==='ice_machine';});
+  document.getElementById('cta').innerHTML='<div class="cta-footer"><div class="cta-hl">'+(hasIce?'Need help fixing your ice machine violation?':'Get help fixing your violations')+'</div><div class="cta-btns"><a href="tel:7278556873" class="btn-cta-p">📞 Call (727) 855-6873</a><a href="#" class="btn-cta-s">📅 Book Free Inspection</a></div></div>';
+}
+
+function renderReport(biz,allP,actions){
+  actions=actions||_actions;
+  var score=calcScoreWithActions(biz,actions);
+  var viols=biz.violations||[];
+  var id=fmtDate(biz.last_inspection_date),disp=biz.last_inspection_disposition||'';
+  var iw=disp.toLowerCase().includes('warning');
+  var cards=viols.map(function(v,i){return violCardHtml(v,i,allP,actions);}).join('');
+  document.getElementById('main').innerHTML='<div class="page">'
+    +'<div class="card"><div class="biz-name">'+esc(biz.name)+'</div><div class="biz-addr">'+esc(biz.address)+', '+esc(biz.city)+'</div>'+(id?'<div class="biz-insp">Last inspected: '+id+' · '+esc(disp)+'</div>':'')+'</div>'
+    +'<div id="score-hero-wrap">'+scoreHeroHtml(score)+'</div>'
+    +'<div id="share-area">'+shareBtnHtml()+'</div>'
+    +'<div class="sec-lbl">Most Recent Inspection</div>'
+    +'<div class="card"><div class="insp-date">'+esc(id||'Date not available')+'</div><div class="insp-disp">'+esc(disp)+'</div>'+(iw?'<div class="cb-warn"><div class="cb-warn-ttl">⚠ Callback Inspection Scheduled</div><div class="cb-warn-txt">This inspection resulted in a Warning. DBPR will schedule a callback inspection — typically within 14–21 days — to verify violations are corrected. Unresolved violations at callback may result in an Administrative Complaint.</div></div>':'')+'</div>'
+    +'<div class="sec-lbl">Violations ('+viols.length+')</div>'
+    +'<div id="viols-section">'+cards+'</div>'
+    +countyHtml(biz,score)
+    +timelineHtml(biz)
+    +'</div>';
+  renderCTA(biz);
+}
+
+function renderNoViolations(biz){
+  document.getElementById('main').innerHTML='<div class="page"><div class="card"><div class="biz-name">'+esc(biz.name)+'</div><div class="biz-addr">'+esc(biz.address)+', '+esc(biz.city)+'</div></div><div class="score-hero" style="background:#27AE60"><div class="score-num">100</div><div class="score-lbl">GOOD</div><div class="score-sub">CleanScore out of 100</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:100%"></div></div></div><div class="card" style="text-align:center;padding:24px"><div style="font-size:36px;margin-bottom:10px">✅</div><div style="font-size:17px;font-weight:700;margin-bottom:8px">No violations found</div><div style="font-size:14px;color:var(--gray-text);line-height:1.5">'+esc(biz.name)+' had no violations on their most recent inspection.</div></div></div>';
+}
+
+function renderNotFound(){
+  document.getElementById('main').innerHTML='<div class="state-pg"><div class="state-icon">🔍</div><div class="state-ttl">Business not found</div><div class="state-txt">We couldn\'t find a record for this business in Pinellas County\'s inspection database.</div><ul class="state-list"><li>• The business may not have been inspected recently</li><li>• The license number may be incorrect</li><li>• The business may operate under a different name</li></ul><a href="/" class="btn-link">Search for your business →</a></div>';
+}
+
+function renderError(){
+  document.getElementById('main').innerHTML='<div class="state-pg"><div class="state-icon">⚠️</div><div class="state-ttl">Unable to load report</div><div class="state-txt">Please try again in a moment.</div><button class="btn-link" onclick="location.reload()">Retry</button></div>';
+}
+
+var _viols=[];
+function doSearch(){
+  var inp=document.getElementById('sinp');if(!inp)return;
+  var q=inp.value.trim();if(!q)return;
+  var el=document.getElementById('sres');if(!el)return;
+  var isNum=/^\d+$/.test(q),res;
+  if(isNum){res=_viols.filter(function(b){return String(b.id)===q||String(b.license)===q;});}
+  else{var ql=q.toLowerCase();res=_viols.filter(function(b){return(b.name||'').toLowerCase().includes(ql)||(b.city||'').toLowerCase().includes(ql);});}
+  if(!res.length){el.innerHTML='<div class="search-none">No results found in Pinellas County for "'+esc(q)+'"</div>';return;}
+  if(res.length===1){window.location.href='?id='+encodeURIComponent(res[0].id);return;}
+  var html=res.slice(0,10).map(function(b){return'<div class="sr-item" onclick="window.location.href=\'?id='+encodeURIComponent(b.id)+'\'"><div><div class="sr-name">'+esc(b.name)+'</div><div class="sr-city">'+esc(b.city)+(b.last_inspection_date?' · '+b.last_inspection_date:'')+'</div></div><div class="sr-arr">›</div></div>';}).join('');
+  if(res.length>10)html+='<div class="search-none">Showing 10 of '+res.length+' results. Try a more specific name.</div>';
+  el.innerHTML=html;
+}
+
+function renderSearch(prefill){
+  document.getElementById('main').innerHTML='<div class="search-pg"><div class="search-logo">CleanScore</div><div class="search-tag">Know your score. Fix what matters.</div><div class="search-form"><input id="sinp" class="search-inp" type="search" placeholder="Business name or license number" autocomplete="off" value="'+esc(prefill||'')+'"><button class="btn-go" onclick="doSearch()">Search →</button><div id="sres" class="search-results"></div></div><div class="search-powered">Powered by Pinellas Ice Co</div></div>';
+  var inp=document.getElementById('sinp');
+  if(inp)inp.addEventListener('keydown',function(e){if(e.key==='Enter')doSearch();});
+  if(prefill)setTimeout(doSearch,10);
+}
+
+// ── Action logging ────────────────────────────────────────────────────────
+function openActionLog(vidx,vcat){
+  var violation=currentBusiness?currentBusiness.violations[vidx]:null;
+  var sop=SOP[vcat]||SOP.other;
+  var existing=_actions.find(function(a){return a.violation_index===vidx;});
+  var today=new Date().toISOString().slice(0,10);
+  var bg=document.createElement('div');
+  bg.id='action-bg';
+  bg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:3000;'
+    +'display:flex;align-items:flex-end;justify-content:center';
+  var existingDocsHtml='';
+  if(existing&&existing.doc_urls&&existing.doc_urls.length){
+    existingDocsHtml='<div style="font-size:12px;color:#6C757D;margin-bottom:16px">Previously uploaded: '
+      +existing.doc_urls.map(function(u,i){return'<a href="'+esc(u)+'" target="_blank" style="color:#C0392B">File '+(i+1)+'</a>';}).join(', ')
+      +'</div>';
+  }
+  bg.innerHTML='<div style="background:#fff;border-radius:20px 20px 0 0;padding:24px;'
+    +'width:100%;max-width:520px;max-height:85vh;overflow-y:auto;'
+    +'padding-bottom:max(24px,env(safe-area-inset-bottom))">'
+    +'<div style="font-size:16px;font-weight:700;color:#1A1A1A;margin-bottom:4px">Log Action — '+esc(sop.label)+'</div>'
+    +'<div style="font-size:12px;color:#6C757D;margin-bottom:20px">Document what you did to fix this violation</div>'
+    +'<label style="font-size:12px;font-weight:700;color:#4A4A4A;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">What did you do?</label>'
+    +'<textarea id="al-text" rows="3" placeholder="e.g. Professional deep clean completed by Pinellas Ice Co, ATP reading 4 RLU after cleaning..." '
+    +'style="width:100%;padding:12px;border:1px solid #E9ECEF;border-radius:8px;font-size:14px;font-family:inherit;box-sizing:border-box;resize:none;margin-bottom:16px">'
+    +(existing?esc(existing.action_text):'')
+    +'</textarea>'
+    +'<label style="font-size:12px;font-weight:700;color:#4A4A4A;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">When?</label>'
+    +'<input type="date" id="al-date" value="'+(existing?esc(existing.action_date):today)+'" '
+    +'style="width:100%;padding:12px;border:1px solid #E9ECEF;border-radius:8px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:16px">'
+    +'<label style="font-size:12px;font-weight:700;color:#4A4A4A;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Documentation</label>'
+    +'<div style="font-size:12px;color:#6C757D;margin-bottom:8px">'+esc(sop.documentation)+'</div>'
+    +'<div id="al-files-preview" style="margin-bottom:8px"></div>'
+    +'<label style="display:block;padding:10px;background:#FFF5F5;border:1px dashed #C0392B;border-radius:8px;text-align:center;font-size:13px;color:#C0392B;font-weight:600;cursor:pointer;margin-bottom:16px">'
+    +'📎 Add photo or PDF (max 10MB each, up to 3)'
+    +'<input type="file" id="al-file-input" multiple accept="image/*,.pdf" style="display:none">'
+    +'</label>'
+    +existingDocsHtml
+    +'<div style="display:flex;gap:10px">'
+    +'<button ontouchend="event.preventDefault();closeActionLog()" onclick="closeActionLog()" '
+    +'style="flex:1;padding:14px;background:#F8F9FA;color:#4A4A4A;border:none;border-radius:10px;font-size:15px;font-family:inherit;cursor:pointer;touch-action:manipulation">Cancel</button>'
+    +'<button id="al-save-btn" data-vidx="'+vidx+'" data-vcat="'+esc(vcat)+'"'
+    +' ontouchend="event.preventDefault();saveActionLog(parseInt(this.dataset.vidx),this.dataset.vcat)"'
+    +' onclick="saveActionLog(parseInt(this.dataset.vidx),this.dataset.vcat)"'
+    +' style="flex:2;padding:14px;background:#C0392B;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;touch-action:manipulation">'
+    +'Save Action</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(bg);
+  var fi=document.getElementById('al-file-input');
+  if(fi)fi.addEventListener('change',function(e){handleFileSelection(e.target.files);});
+  bg.addEventListener('touchend',function(e){if(e.target===bg)closeActionLog();});
+  bg.addEventListener('click',function(e){if(e.target===bg)closeActionLog();});
+}
+
+function closeActionLog(){
+  var bg=document.getElementById('action-bg');if(bg)bg.remove();
+  _pendingFiles=[];
+}
+
+function handleFileSelection(files){
+  var preview=document.getElementById('al-files-preview');if(!preview)return;
+  var toAdd=Array.from(files).slice(0,3-_pendingFiles.length);
+  toAdd.forEach(function(file){
+    if(file.size>10*1024*1024){showToast('File too large — max 10MB');return;}
+    _pendingFiles.push(file);
+  });
+  preview.innerHTML=_pendingFiles.map(function(f,i){
+    return'<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#F8F9FA;border-radius:6px;margin-bottom:6px;font-size:13px">'
+      +'📄 '+esc(f.name)
+      +'<button data-fidx="'+i+'" ontouchend="event.preventDefault();removeFile(parseInt(this.dataset.fidx))" onclick="removeFile(parseInt(this.dataset.fidx))" '
+      +'style="margin-left:auto;background:none;border:none;color:#C0392B;cursor:pointer;font-size:16px;touch-action:manipulation">✕</button>'
+      +'</div>';
+  }).join('');
+}
+
+function removeFile(index){
+  _pendingFiles.splice(index,1);
+  handleFileSelection([]);
+}
+
+async function uploadFiles(businessId,violationIndex){
+  var urls=[];
+  for(var i=0;i<_pendingFiles.length;i++){
+    var file=_pendingFiles[i];
+    var path=businessId+'/'+violationIndex+'/'+Date.now()+'_'+file.name;
+    try{
+      var up=await csDb.storage.from('cs-docs').upload(path,file,{upsert:true});
+      if(!up.error){
+        var pu=csDb.storage.from('cs-docs').getPublicUrl(path);
+        urls.push(pu.data.publicUrl);
+      }
+    }catch(e){console.error('Upload error:',e);}
+  }
+  return urls;
+}
+
+async function saveActionLog(vidx,vcat){
+  var text=(document.getElementById('al-text')||{}).value||'';
+  var dateVal=(document.getElementById('al-date')||{}).value||'';
+  var saveBtn=document.getElementById('al-save-btn');
+  if(!text.trim()){showToast('Please describe what you did');return;}
+  if(!dateVal){showToast('Please select a date');return;}
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='Saving...';}
+  var businessId=getBusinessId(currentBusiness);
+  var docUrls=[];
+  if(_pendingFiles.length>0)docUrls=await uploadFiles(businessId,vidx);
+  var existing=_actions.find(function(a){return a.violation_index===vidx;});
+  try{
+    if(existing){
+      var allDocs=(existing.doc_urls||[]).concat(docUrls);
+      var upd=await csDb.from('cs_actions').update({action_text:text.trim(),action_date:dateVal,doc_urls:allDocs,updated_at:new Date().toISOString()}).eq('id',existing.id);
+      if(!upd.error){existing.action_text=text.trim();existing.action_date=dateVal;existing.doc_urls=allDocs;}
+    }else{
+      var ins=await csDb.from('cs_actions').insert({business_id:businessId,violation_index:vidx,violation_category:vcat,action_text:text.trim(),action_date:dateVal,doc_urls:docUrls}).select().single();
+      if(!ins.error&&ins.data)_actions.push(ins.data);
+    }
+    closeActionLog();
+    _pendingFiles=[];
+    renderViolations();
+    updateScoreDisplay();
+    showToast('Action saved — score updated');
+  }catch(e){
+    console.error('Save error:',e);
+    showToast('Save failed — please try again');
+    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='Save Action';}
+  }
+}
+
+// ── Share flow ────────────────────────────────────────────────────────────
+async function generateShareLink(){
+  var businessId=getBusinessId(currentBusiness);
+  var token=businessId+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);
+  try{
+    var r=await csDb.from('cs_actions').update({share_token:token}).eq('business_id',businessId);
+    if(!r.error)return window.location.origin+'/?verify='+token;
+  }catch(e){console.error('generateShare:',e);}
+  return null;
+}
+
+async function openShareFlow(){
+  var btn=document.getElementById('share-btn');
+  if(btn){btn.disabled=true;btn.textContent='Generating...';}
+  var shareUrl=await generateShareLink();
+  if(btn){btn.disabled=false;btn.textContent='📋 Generate Inspector Report';}
+  if(!shareUrl){showToast('Could not generate link — try again');return;}
+  var bg=document.createElement('div');
+  bg.id='share-bg';
+  bg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:3000;'
+    +'display:flex;align-items:flex-end;justify-content:center';
+  bg.innerHTML='<div style="background:#fff;border-radius:20px 20px 0 0;padding:24px;'
+    +'width:100%;max-width:520px;padding-bottom:max(24px,env(safe-area-inset-bottom))">'
+    +'<div style="font-size:18px;font-weight:700;color:#1A1A1A;margin-bottom:8px">📋 Inspector Report Ready</div>'
+    +'<div style="font-size:14px;color:#6C757D;margin-bottom:20px">Share this link with your inspector to verify your corrective actions and documentation.</div>'
+    +'<div style="background:#F8F9FA;border-radius:8px;padding:12px;font-size:12px;color:#4A4A4A;word-break:break-all;margin-bottom:16px;font-family:monospace">'+esc(shareUrl)+'</div>'
+    +'<button data-url="'+esc(shareUrl)+'" id="copy-share-btn"'
+    +' ontouchend="event.preventDefault();copyShareLink(this.dataset.url)"'
+    +' onclick="copyShareLink(this.dataset.url)"'
+    +' style="width:100%;padding:14px;background:#C0392B;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;touch-action:manipulation;margin-bottom:10px">'
+    +'📋 Copy Link</button>'
+    +'<button data-url="'+esc(shareUrl)+'"'
+    +' ontouchend="event.preventDefault();nativeShare(this.dataset.url)"'
+    +' onclick="nativeShare(this.dataset.url)"'
+    +' style="width:100%;padding:14px;background:#fff;border:1px solid #E9ECEF;color:#4A4A4A;border-radius:10px;font-size:15px;font-family:inherit;cursor:pointer;touch-action:manipulation;margin-bottom:10px">'
+    +'↗ Share via Messages / Email</button>'
+    +'<button ontouchend="event.preventDefault();closeShareFlow()" onclick="closeShareFlow()" '
+    +'style="width:100%;padding:12px;background:none;border:none;color:#6C757D;font-size:14px;font-family:inherit;cursor:pointer;touch-action:manipulation">Done</button>'
+    +'</div>';
+  document.body.appendChild(bg);
+  bg.addEventListener('touchend',function(e){if(e.target===bg)closeShareFlow();});
+  bg.addEventListener('click',function(e){if(e.target===bg)closeShareFlow();});
+}
+
+function closeShareFlow(){var bg=document.getElementById('share-bg');if(bg)bg.remove();}
+
+function copyShareLink(url){
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(url).then(function(){
+      var btn=document.getElementById('copy-share-btn');
+      if(btn)btn.textContent='✓ Copied!';
+      setTimeout(function(){var btn=document.getElementById('copy-share-btn');if(btn)btn.textContent='📋 Copy Link';},2000);
+    });
+  }
+}
+
+function nativeShare(url){
+  if(navigator.share){
+    navigator.share({title:'CleanScore — Compliance Report',text:'Inspection compliance documentation for '+(currentBusiness?currentBusiness.name:'our restaurant'),url:url});
+  }else{copyShareLink(url);}
+}
+
+// ── Verify page ───────────────────────────────────────────────────────────
+async function renderVerifyPage(token){
+  var actions=await loadActionsByToken(token);
+  if(!actions.length){
+    document.body.innerHTML='<div style="font-family:-apple-system,sans-serif;padding:40px 20px;text-align:center">'
+      +'<div style="font-size:48px">❓</div><h2>Report not found</h2>'
+      +'<p style="color:#6C757D">This link may be invalid or expired.</p></div>';
+    return;
+  }
+  var businessId=actions[0].business_id;
+  var business=_violations.find(function(b){return b.id===businessId||b.license===businessId;});
+  var score=business?calcScoreWithActions(business,actions):100;
+  var sc=scoreColor(score);
+  var sl=scoreLabel(score);
+  var today=new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  var actionsHtml=actions.map(function(a){
+    var sop=SOP[a.violation_category]||SOP.other;
+    var docsHtml='';
+    if(a.doc_urls&&a.doc_urls.length){
+      docsHtml=a.doc_urls.map(function(u,i){
+        return'<a href="'+esc(u)+'" target="_blank" '
+          +'style="display:inline-block;margin-top:6px;padding:6px 12px;background:#F8F9FA;'
+          +'border:1px solid #E9ECEF;border-radius:6px;font-size:12px;color:#C0392B;text-decoration:none">'
+          +'📄 View Document '+(i+1)+'</a> ';
+      }).join('');
+    }
+    return'<div style="padding:16px 0;border-bottom:1px solid #E9ECEF">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+      +'<span style="color:#27AE60;font-size:18px">✅</span>'
+      +'<span style="font-size:14px;font-weight:700;color:#1A1A1A">'+esc(sop.label)+'</span>'
+      +'</div>'
+      +'<div style="font-size:13px;color:#4A4A4A;margin-bottom:4px">'+esc(a.action_text)+'</div>'
+      +'<div style="font-size:12px;color:#6C757D">Date: '+esc(a.action_date)+'</div>'
+      +(docsHtml?'<div>'+docsHtml+'</div>':'')
+      +'</div>';
+  }).join('');
+  document.body.innerHTML='<div style="font-family:-apple-system,sans-serif;max-width:520px;margin:0 auto;padding:0 0 40px 0">'
+    +'<div style="background:#1A0A09;padding:20px;text-align:center">'
+    +'<div style="font-size:22px;font-weight:800;color:#C0392B;letter-spacing:-.5px">CleanScore</div>'
+    +'<div style="font-size:12px;color:#9E9E9E;margin-top:2px">Compliance Verification Report</div>'
+    +'</div>'
+    +'<div style="padding:20px;border-bottom:1px solid #E9ECEF">'
+    +'<div style="font-size:18px;font-weight:700;color:#1A1A1A">'+(business?esc(business.name):'Restaurant')+'</div>'
+    +(business?'<div style="font-size:13px;color:#6C757D">'+esc(business.address)+', '+esc(business.city)+'</div>':'')
+    +'<div style="font-size:12px;color:#6C757D;margin-top:4px">Report generated: '+today+'</div>'
+    +'</div>'
+    +'<div style="padding:20px;border-bottom:1px solid #E9ECEF">'
+    +'<div style="display:flex;align-items:center;gap:12px">'
+    +'<div style="background:'+sc+';color:#fff;width:60px;height:60px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;flex-shrink:0">'+score+'</div>'
+    +'<div><div style="font-size:16px;font-weight:700;color:'+sc+'">'+sl+'</div>'
+    +'<div style="font-size:12px;color:#6C757D">CleanScore after corrective actions</div></div>'
+    +'</div></div>'
+    +'<div style="padding:20px">'
+    +'<div style="font-size:12px;font-weight:700;color:#6C757D;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Corrective Actions on File</div>'
+    +actionsHtml
+    +'</div>'
+    +'<div style="padding:20px;text-align:center;border-top:1px solid #E9ECEF">'
+    +'<div style="font-size:12px;color:#9E9E9E">Powered by Pinellas Ice Co<br>cleanscore.pinellasiceco.com<br>'
+    +'<a href="tel:7278556873" style="color:#C0392B">(727) 855-6873</a></div>'
+    +'</div></div>';
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+async function init(){
+  renderHeader();
+  document.getElementById('main').innerHTML='<div class="loading-pg"><div class="loading-logo">CleanScore</div><div class="loading-txt">Loading report...</div></div>';
+  var viols,partners;
+  try{
+    var res=await Promise.all([fetch(VIOLATIONS_URL),fetch(PARTNERS_URL)]);
+    viols=await res[0].json();if(!Array.isArray(viols))viols=[];
+    try{partners=await res[1].json();}catch(e){partners=[];}
+    if(!Array.isArray(partners))partners=[];
+  }catch(e){renderError();return;}
+  _violations=viols;_viols=viols;
+  _partners=partners;
+  var p=new URLSearchParams(window.location.search);
+  var verifyToken=p.get('verify');
+  var idP=p.get('id'),licP=p.get('license'),qP=p.get('q');
+  if(verifyToken){await renderVerifyPage(verifyToken);return;}
+  if(!idP&&!licP&&!qP){renderSearch();return;}
+  if(qP){renderSearch(qP);return;}
+  var biz=null;
+  if(idP)biz=viols.find(function(b){return String(b.id)===String(idP);});
+  else if(licP)biz=viols.find(function(b){return String(b.license)===String(licP)||String(b.id)===String(licP);});
+  if(!biz){renderNotFound();return;}
+  if(!biz.violations||!biz.violations.length){renderNoViolations(biz);return;}
+  currentBusiness=biz;
+  var businessId=getBusinessId(biz);
+  _actions=await loadActionsForBusiness(businessId);
+  renderReport(biz,partners,_actions);
+}
+
+init();
+</script>
+</body>
+</html>
