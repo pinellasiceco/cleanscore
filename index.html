@@ -180,6 +180,15 @@ function calcScoreWithActions(biz,actions){
   var citedCount=hist.filter(function(h){return(h.violation_count||h.violations_count||0)>0||h.had_violations;}).length;
   if(citedCount>=3)s=Math.min(s,65);
   else if(citedCount>=2)s=Math.min(s,75);
+  var disp=String(biz.last_inspection_disposition||'').toLowerCase();
+  if(disp.indexOf('complaint')!==-1){
+    if(s>40)s=40;
+  }else if(disp.indexOf('warning')!==-1){
+    if(s>70)s=70;
+  }
+  if(disp.indexOf('closure')!==-1||disp.indexOf('closed')!==-1){
+    if(s>20)s=20;
+  }
   return Math.max(0,Math.min(100,s));
 }
 
@@ -271,9 +280,19 @@ function violCardHtml(v,idx,allP,actions){
   var bc=act?'#27AE60':(v.severity==='high'?'#C0392B':v.severity==='major'?'#E67E22':'#95A5A6');
   var bclass=v.severity==='high'?'badge-high':v.severity==='major'?'badge-major':'badge-basic';
   var blabel=v.severity==='high'?'HIGH PRIORITY':v.severity==='major'?'MAJOR':'BASIC';
+  var isRepeat=(v.repeat===true||v.repeat==='true'||v.repeat===1
+    ||(v.category==='ice_machine'&&parseInt((currentBusiness&&currentBusiness.cit_ice_count)||0)>=2));
+  var repeatBadge='';
+  if(isRepeat){
+    repeatBadge='<div style="background:#FADBD8;border-radius:6px;padding:6px 10px;'
+      +'margin-bottom:10px;font-size:12px;color:#922B21;font-weight:600">'
+      +'&#x1F501; Repeat Violation &#8212; this same violation appeared on a prior inspection. '
+      +'Inspectors treat repeat violations more seriously and are more likely to escalate enforcement.'
+      +'</div>';
+  }
   var flags='';
   if(v.corrected_on_site)flags+='<span class="v-flag flag-cos">✓ Corrected On-Site</span>';
-  if(v.repeat)flags+='<span class="v-flag flag-rep">⚠ Repeat</span>';
+  if(isRepeat)flags+='<span class="v-flag flag-rep">⚠ Repeat</span>';
   var pb='';
   if(v.category==='ice_machine'){pb=pboxHtml(PINELLAS_ICE_CO,true);}
   else if(CATEGORY_PARTNER_TYPE[v.category]){var m=getPartners(v.category,allP);if(m.length)pb=pboxHtml(m[0],false);}
@@ -325,12 +344,13 @@ function violCardHtml(v,idx,allP,actions){
     +'<div><div class="v-name">'+esc(meta.label)+'</div>'
     +(v.code?'<div style="font-size:10px;color:var(--gray-text);margin-top:1px">'+esc(v.code)+'</div>':'')
     +'</div></div>'
-    +'<div class="vcard-hdr-r">'+(v.repeat?'<span class="v-badge badge-high" style="font-size:9px">REPEAT</span>':'')+'<span class="v-badge '+bclass+'">'+blabel+'</span>'
+    +'<div class="vcard-hdr-r">'+(isRepeat?'<span class="v-badge badge-high" style="font-size:9px">REPEAT</span>':'')+'<span class="v-badge '+bclass+'">'+blabel+'</span>'
     +(act?'<span style="font-size:16px">✅</span>':'')
     +'<span class="v-chev" id="vc-'+idx+'">▼</span></div>'
     +'</div>'
     +(pb?pb:'')
     +'<div class="vcard-body" id="vb-'+idx+'">'
+    +repeatBadge
     +(flags?'<div class="v-flags">'+flags+'</div>':'')
     +'<div class="v-sec"><div class="v-sec-lbl">What the inspector found</div><div class="v-obs">'+esc(v.text)+'</div></div>'
     +(v.code?'<div style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#F8F9FA;color:#6C757D;margin-bottom:12px">Code: '+esc(v.code)+'</div>':'')
@@ -412,25 +432,63 @@ function renderInspectionTimeline(biz){
     +'</div>';
 }
 
-function renderActionBanners(biz,score){
-  var banners='';
-  var disp=(biz.last_inspection_disposition||'').toLowerCase();
-  var daysSince=null;
-  if(biz.last_inspection_date)daysSince=Math.floor((Date.now()-new Date(biz.last_inspection_date+'T12:00:00Z').getTime())/86400000);
-  if(disp.includes('warning')&&daysSince!==null&&daysSince>=10&&daysSince<=28){
-    banners+='<div style="margin:0 16px 4px;background:#FFF3E0;border:1px solid #FFB74D;border-radius:10px;padding:14px">'
-      +'<div style="font-size:12px;font-weight:700;color:#E65100;margin-bottom:4px">⏰ Callback Inspection Imminent</div>'
-      +'<div style="font-size:13px;color:var(--text-med);line-height:1.5">Your Warning inspection was '+daysSince+' days ago. DBPR callback inspections typically occur within 14–21 days. Ensure all violations are corrected and documented now.</div>'
-      +'</div>';
+function renderActionBanners(business){
+  var banners=[];
+  var lastDate=business.last_inspection_date;
+  var disposition=String(business.last_inspection_disposition||'').toLowerCase();
+  var daysSince=0;
+  if(lastDate){
+    var d=new Date(lastDate+'T12:00:00');
+    if(!isNaN(d.getTime())){
+      daysSince=Math.floor((Date.now()-d.getTime())/864e5);
+    }
   }
-  var openViols=(biz.violations||[]).filter(function(v){return !v.corrected_on_site;});
-  if(daysSince!==null&&daysSince>121&&openViols.length>0){
-    banners+='<div style="margin:0 16px 4px;background:#FFF5F5;border:1px solid var(--red-light);border-radius:10px;padding:14px">'
-      +'<div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:4px">⚠ Overdue — Next Inspection Window</div>'
-      +'<div style="font-size:13px;color:var(--text-med);line-height:1.5">It has been '+daysSince+' days since your last inspection with '+openViols.length+' uncorrected violation'+(openViols.length!==1?'s':'')+'. Most Pinellas restaurants are inspected every 6 months. Correct outstanding violations now.</div>'
-      +'</div>';
+  if(disposition.indexOf('complaint')!==-1){
+    banners.push({
+      color:'#7D0000',bg:'#FADBD8',icon:'&#x26A0;',
+      title:'Administrative Complaint Filed',
+      body:'DBPR has filed a formal Administrative Complaint against this establishment. '
+        +'This is a legal enforcement action that can result in fines, license suspension, '
+        +'or revocation. Correct all violations immediately and document everything. '
+        +'Contact a food safety attorney if needed.',
+      priority:0
+    });
   }
-  return banners;
+  if(disposition.indexOf('warning')!==-1&&daysSince>=10&&daysSince<=28){
+    var daysLeft=Math.max(0,21-daysSince);
+    banners.push({
+      color:'#C0392B',bg:'#FADBD8',icon:'&#x23F1;',
+      title:'Callback Inspection Imminent',
+      body:'Your Warning Issued inspection was '+daysSince+' days ago. '
+        +'Callback inspections typically arrive within 21 days. Estimated '
+        +daysLeft+' day'+(daysLeft!==1?'s':'')+' remaining. All open violations must '
+        +'be documented before the inspector returns.',
+      priority:1
+    });
+  }
+  if(daysSince>121
+      &&parseInt(business.cit_ice_count||0)>0
+      &&disposition.indexOf('warning')===-1
+      &&disposition.indexOf('complaint')===-1){
+    banners.push({
+      color:'#E67E22',bg:'#FDEBD0',icon:'&#x1F4C5;',
+      title:'Routine Inspection Window Open',
+      body:'Your last inspection was '+daysSince+' days ago. '
+        +'The median inspection interval in Pinellas County is 121 days. '
+        +'An inspector could arrive any business day.',
+      priority:2
+    });
+  }
+  if(!banners.length)return'';
+  banners.sort(function(a,b){return a.priority-b.priority;});
+  return banners.map(function(b){
+    return'<div style="background:'+b.bg+';border-left:4px solid '+b.color+';'
+      +'border-radius:0 8px 8px 0;padding:14px;margin:0 16px 12px">'
+      +'<div style="font-size:13px;font-weight:700;color:'+b.color+';margin-bottom:4px">'
+      +b.icon+' '+b.title+'</div>'
+      +'<div style="font-size:13px;color:#4A4A4A;line-height:1.6">'+b.body+'</div>'
+      +'</div>';
+  }).join('');
 }
 
 function severityLegendHtml(){
