@@ -126,6 +126,7 @@ try{csDb=supabase.createClient(CS_SUPABASE_URL,CS_ANON_KEY);}catch(e){console.er
 var VIOLATIONS_URL='https://kbyqatbkqqhuasbjlcwe.supabase.co/storage/v1/object/public/cleanscore/cleanscore_violations.json';
 var PARTNERS_URL='https://kbyqatbkqqhuasbjlcwe.supabase.co/storage/v1/object/public/cleanscore/cleanscore_partners.json';
 var STATS_URL='https://kbyqatbkqqhuasbjlcwe.supabase.co/storage/v1/object/public/cleanscore/cleanscore_stats.json';
+var INSPECTORS_URL='https://kbyqatbkqqhuasbjlcwe.supabase.co/storage/v1/object/public/cleanscore/cleanscore_inspectors.json';
 var PINELLAS_ICE_CO={name:'Pinellas Ice Co',type:'ice',phone:'7278556873',city:'Clearwater',description:'Ice Machine Cleaning & Sanitizing',verified:true};
 // Replace with the real Stripe payment link URL after creating the product in Stripe Dashboard.
 // How: Dashboard → Payment Links → Create new → "CleanScore Annual Subscription" $149/year
@@ -155,6 +156,7 @@ var _partners=[];
 var _pendingFiles=[];
 var _loadedSOPs={};
 var _stats=null;
+var _inspectors=null;
 
 // ── Utilities ─────────────────────────────────────────────────────────────
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -671,6 +673,26 @@ function renderIntelligenceSection(biz,stats){
   return'<div class="sec-lbl">Data Intelligence</div>'+sections.join('');
 }
 
+function renderInspectorSection(business,inspectors){
+  var inspName=(business.inspector_name||'').trim();
+  if(!inspName)return'';
+  var list=(inspectors&&inspectors.inspectors)||[];
+  var insp=list.find(function(i){return i.name===inspName;})||null;
+  var rows='';
+  if(insp){
+    rows='<div class="intel-row"><span class="intel-lbl">Inspections on record</span><span class="intel-val">'+insp.inspection_count+'</span></div>'
+      +'<div class="intel-row"><span class="intel-lbl">Avg violations cited</span><span class="intel-val">'+((insp.avg_violations_per_inspection||0).toFixed(1))+' per visit</span></div>'
+      +'<div class="intel-row"><span class="intel-lbl">Ice machine citation rate</span><span class="intel-val">'+Math.round((insp.ice_machine_citation_rate||0)*100)+'%</span></div>';
+  }
+  return'<div class="sec-lbl">Know Your Inspector</div>'
+    +'<div class="intel-card">'
+    +'<div class="intel-hdr">'+esc(inspName)+'</div>'
+    +'<div class="intel-sub">Inspector assigned to your most recent inspection</div>'
+    +rows
+    +'<div style="font-size:12px;color:var(--gray-text);margin-top:10px;line-height:1.5">Statistics based on DBPR inspection records for this inspector in Pinellas County.</div>'
+    +'</div>';
+}
+
 function renderReport(business,score,actions,partners){
   actions=actions||_actions;
   partners=partners||_partners;
@@ -688,6 +710,7 @@ function renderReport(business,score,actions,partners){
     +'<div id="viols-section">'+renderViolationCards(business,actions,partners)+'</div>'
     +renderCountyContext(business,score)
     +renderIntelligenceSection(business,_stats)
+    +renderInspectorSection(business,_inspectors)
     +renderWhatHappensNext(business)
     +'</div>';
   renderCTA(business);
@@ -1226,6 +1249,11 @@ async function fetchStats(){
   try{var r=await fetch(STATS_URL);if(r.ok)_stats=await r.json();}
   catch(e){console.warn('CleanScore stats unavailable');}
 }
+async function fetchInspectors(){
+  try{var r=await fetch(INSPECTORS_URL);if(r.ok)return await r.json();}
+  catch(e){console.warn('CleanScore inspectors unavailable');}
+  return null;
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────
 async function init(){
@@ -1245,6 +1273,7 @@ async function init(){
   }catch(e){renderError();return;}
   _violations=viols;_viols=viols;
   _partners=partners;
+  _inspectors=await fetchInspectors();
 
   var verifyToken=p.get('verify');
   var idP=p.get('id'),licP=p.get('license'),qP=p.get('q');
