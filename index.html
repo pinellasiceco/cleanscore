@@ -170,11 +170,16 @@ function calcScoreWithActions(biz,actions){
   (biz.violations||[]).forEach(function(v,i){
     if(v.corrected_on_site)return;
     if((actions||[]).some(function(a){return a.violation_index===i;}))return;
-    if(v.severity==='high')s-=15;
+    if(v.severity==='high')s-=18;
     else if(v.severity==='major')s-=10;
     else s-=5;
     if(v.repeat)s-=5;
   });
+  // Citation history hard ceilings
+  var hist=(biz.inspection_history||[]);
+  var citedCount=hist.filter(function(h){return(h.violation_count||h.violations_count||0)>0||h.had_violations;}).length;
+  if(citedCount>=3)s=Math.min(s,65);
+  else if(citedCount>=2)s=Math.min(s,75);
   return Math.max(0,Math.min(100,s));
 }
 
@@ -316,8 +321,11 @@ function violCardHtml(v,idx,allP,actions){
   }
   return'<div class="vcard" style="border-left:4px solid '+bc+'">'
     +'<div class="vcard-hdr" onclick="toggleCard('+idx+')">'
-    +'<div class="vcard-hdr-l"><span class="v-icon">'+meta.icon+'</span><span class="v-name">'+esc(meta.label)+'</span></div>'
-    +'<div class="vcard-hdr-r"><span class="v-badge '+bclass+'">'+blabel+'</span>'
+    +'<div class="vcard-hdr-l"><span class="v-icon">'+meta.icon+'</span>'
+    +'<div><div class="v-name">'+esc(meta.label)+'</div>'
+    +(v.code?'<div style="font-size:10px;color:var(--gray-text);margin-top:1px">'+esc(v.code)+'</div>':'')
+    +'</div></div>'
+    +'<div class="vcard-hdr-r">'+(v.repeat?'<span class="v-badge badge-high" style="font-size:9px">REPEAT</span>':'')+'<span class="v-badge '+bclass+'">'+blabel+'</span>'
     +(act?'<span style="font-size:16px">✅</span>':'')
     +'<span class="v-chev" id="vc-'+idx+'">▼</span></div>'
     +'</div>'
@@ -331,6 +339,114 @@ function violCardHtml(v,idx,allP,actions){
     +'</div>'
     +'</div>';
 }
+
+function renderInspectionHeader(biz){
+  var id=fmtDate(biz.last_inspection_date);
+  var disp=biz.last_inspection_disposition||'';
+  var dl=disp.toLowerCase();
+  var badge,badgeColor,badgeBg,explanation;
+  if(dl.includes('emergency')||dl.includes('closure')){
+    badge='Emergency Closure';badgeColor='#fff';badgeBg='#C0392B';
+    explanation='The inspector ordered the business to close immediately due to conditions posing an imminent public health risk. Correct all violations and pass a re-inspection before reopening.';
+  }else if(dl.includes('administrative')||dl.includes('complaint')){
+    badge='Admin Complaint';badgeColor='#fff';badgeBg='#C0392B';
+    explanation='DBPR filed a formal Administrative Complaint. This can result in fines, license suspension, or revocation. Correct all violations and document everything immediately.';
+  }else if(dl.includes('warning')){
+    badge='Warning Issued';badgeColor='#fff';badgeBg='#E67E22';
+    explanation='A Warning triggers a DBPR callback inspection — typically within 14–21 days — to verify violations are corrected. Unresolved violations at callback escalate to an Administrative Complaint.';
+  }else if(dl.includes('no further')||dl.includes('nfa')){
+    badge='No Further Action';badgeColor='#27AE60';badgeBg='#D5F5E3';
+    explanation='The inspector cited violations but took no formal enforcement action. Correct all cited violations promptly to avoid issues at your next routine inspection.';
+  }else{
+    badge=disp||'Inspection on Record';badgeColor='#4A4A4A';badgeBg='#F2F3F4';
+    explanation='Review all cited violations and correct them before your next inspection.';
+  }
+  return'<div class="sec-lbl">Most Recent Inspection</div>'
+    +'<div class="card">'
+    +'<div class="insp-date">'+esc(id||'Date not available')+'</div>'
+    +'<div style="margin:6px 0 10px"><span style="display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.5px;background:'+badgeBg+';color:'+badgeColor+'">'+esc(badge)+'</span></div>'
+    +'<div style="font-size:13px;color:var(--text-med);line-height:1.55">'+esc(explanation)+'</div>'
+    +'</div>';
+}
+
+function renderInspectionTimeline(biz){
+  var hist=biz.inspection_history;
+  if(!hist||!hist.length)return'';
+  var recent=hist.slice(-8);
+  var max=1;
+  recent.forEach(function(h){var vc=h.violation_count||h.violations_count||0;if(vc>max)max=vc;});
+  var barW=28,barGap=6,chartH=60,labelH=18;
+  var totalW=(barW+barGap)*recent.length-barGap;
+  var bars=recent.map(function(h,i){
+    var vc=h.violation_count||h.violations_count||0;
+    var bh=vc>0?Math.max(4,Math.round((vc/max)*chartH)):4;
+    var by=chartH-bh;
+    var col=h.had_v22?'#C0392B':vc>0?'#E67E22':'#27AE60';
+    var x=i*(barW+barGap);
+    var yr=h.inspection_year||(h.inspection_date?String(h.inspection_date).slice(2,4):(h.date?String(h.date).slice(2,4):''));
+    return'<rect x="'+x+'" y="'+by+'" width="'+barW+'" height="'+bh+'" rx="3" fill="'+col+'"/>'
+      +'<text x="'+(x+barW/2)+'" y="'+(chartH+labelH-2)+'" text-anchor="middle" font-size="9" fill="#9E9E9E">'+esc(String(yr))+'</text>';
+  }).join('');
+  var lastH=recent[recent.length-1];
+  var prevH=recent.length>1?recent[recent.length-2]:null;
+  var trend='';
+  if(lastH&&prevH){
+    var lvc=lastH.violation_count||lastH.violations_count||0;
+    var pvc=prevH.violation_count||prevH.violations_count||0;
+    if(lvc<pvc)trend='Violations trending down — good progress.';
+    else if(lvc>pvc)trend='Violations trending up — focus on corrections.';
+    else if(lvc===0)trend='Clean inspections across last two periods.';
+    else trend='Violation count unchanged from prior inspection.';
+  }
+  return'<div class="sec-lbl">Inspection History</div>'
+    +'<div class="card">'
+    +'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+totalW+' '+(chartH+labelH)+'" style="display:block;width:100%;max-height:80px">'
+    +bars
+    +'</svg>'
+    +'<div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap">'
+    +'<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--gray-text)"><span style="width:10px;height:10px;border-radius:2px;background:#C0392B;flex-shrink:0;display:inline-block"></span>V22 Violation</div>'
+    +'<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--gray-text)"><span style="width:10px;height:10px;border-radius:2px;background:#E67E22;flex-shrink:0;display:inline-block"></span>Other Violations</div>'
+    +'<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--gray-text)"><span style="width:10px;height:10px;border-radius:2px;background:#27AE60;flex-shrink:0;display:inline-block"></span>Clean</div>'
+    +'</div>'
+    +(trend?'<div style="font-size:12px;color:var(--gray-text);margin-top:8px;font-style:italic">'+esc(trend)+'</div>':'')
+    +'</div>';
+}
+
+function renderActionBanners(biz,score){
+  var banners='';
+  var disp=(biz.last_inspection_disposition||'').toLowerCase();
+  var daysSince=null;
+  if(biz.last_inspection_date)daysSince=Math.floor((Date.now()-new Date(biz.last_inspection_date+'T12:00:00Z').getTime())/86400000);
+  if(disp.includes('warning')&&daysSince!==null&&daysSince>=10&&daysSince<=28){
+    banners+='<div style="margin:0 16px 4px;background:#FFF3E0;border:1px solid #FFB74D;border-radius:10px;padding:14px">'
+      +'<div style="font-size:12px;font-weight:700;color:#E65100;margin-bottom:4px">⏰ Callback Inspection Imminent</div>'
+      +'<div style="font-size:13px;color:var(--text-med);line-height:1.5">Your Warning inspection was '+daysSince+' days ago. DBPR callback inspections typically occur within 14–21 days. Ensure all violations are corrected and documented now.</div>'
+      +'</div>';
+  }
+  var openViols=(biz.violations||[]).filter(function(v){return !v.corrected_on_site;});
+  if(daysSince!==null&&daysSince>121&&openViols.length>0){
+    banners+='<div style="margin:0 16px 4px;background:#FFF5F5;border:1px solid var(--red-light);border-radius:10px;padding:14px">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:4px">⚠ Overdue — Next Inspection Window</div>'
+      +'<div style="font-size:13px;color:var(--text-med);line-height:1.5">It has been '+daysSince+' days since your last inspection with '+openViols.length+' uncorrected violation'+(openViols.length!==1?'s':'')+'. Most Pinellas restaurants are inspected every 6 months. Correct outstanding violations now.</div>'
+      +'</div>';
+  }
+  return banners;
+}
+
+function severityLegendHtml(){
+  return'<div style="display:flex;gap:10px;margin:0 16px 4px;flex-wrap:wrap">'
+    +'<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--gray-text)"><span style="width:8px;height:8px;border-radius:50%;background:#C0392B;flex-shrink:0;display:inline-block"></span>High Priority</div>'
+    +'<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--gray-text)"><span style="width:8px;height:8px;border-radius:50%;background:#E67E22;flex-shrink:0;display:inline-block"></span>Major</div>'
+    +'<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--gray-text)"><span style="width:8px;height:8px;border-radius:50%;background:#95A5A6;flex-shrink:0;display:inline-block"></span>Basic</div>'
+    +'</div>';
+}
+
+function renderViolationCards(biz,actions,allP){
+  return(biz.violations||[]).map(function(v,i){return violCardHtml(v,i,allP,actions);}).join('');
+}
+function renderCountyContext(biz,score){return countyHtml(biz,score);}
+function renderWhatHappensNext(biz){return timelineHtml(biz);}
+function renderShareButton(){return shareBtnHtml();}
 
 function countyHtml(biz,score){
   var cs=biz.county_stats||{};
@@ -497,26 +613,26 @@ function renderIntelligenceSection(biz,stats){
   return'<div class="sec-lbl">Data Intelligence</div>'+sections.join('');
 }
 
-function renderReport(biz,allP,actions){
+function renderReport(business,score,actions,partners){
   actions=actions||_actions;
-  var score=calcScoreWithActions(biz,actions);
-  var viols=biz.violations||[];
-  var id=fmtDate(biz.last_inspection_date),disp=biz.last_inspection_disposition||'';
-  var iw=disp.toLowerCase().includes('warning');
-  var cards=viols.map(function(v,i){return violCardHtml(v,i,allP,actions);}).join('');
+  partners=partners||_partners;
+  if(score===undefined||score===null)score=calcScoreWithActions(business,actions);
+  var viols=business.violations||[];
   document.getElementById('main').innerHTML='<div class="page">'
-    +'<div class="card"><div class="biz-name">'+esc(biz.name)+'</div><div class="biz-addr">'+esc(biz.address)+', '+esc(biz.city)+'</div>'+(id?'<div class="biz-insp">Last inspected: '+id+' · '+esc(disp)+'</div>':'')+'</div>'
+    +'<div class="card"><div class="biz-name">'+esc(business.name)+'</div><div class="biz-addr">'+esc(business.address)+', '+esc(business.city)+'</div></div>'
     +'<div id="score-hero-wrap">'+scoreHeroHtml(score)+'</div>'
-    +'<div id="share-area">'+shareBtnHtml()+'</div>'
-    +'<div class="sec-lbl">Most Recent Inspection</div>'
-    +'<div class="card"><div class="insp-date">'+esc(id||'Date not available')+'</div><div class="insp-disp">'+esc(disp)+'</div>'+(iw?'<div class="cb-warn"><div class="cb-warn-ttl">⚠ Callback Inspection Scheduled</div><div class="cb-warn-txt">This inspection resulted in a Warning. DBPR will schedule a callback inspection — typically within 14–21 days — to verify violations are corrected. Unresolved violations at callback may result in an Administrative Complaint.</div></div>':'')+'</div>'
+    +'<div id="share-area">'+renderShareButton()+'</div>'
+    +renderActionBanners(business,score)
+    +renderInspectionHeader(business)
+    +renderInspectionTimeline(business)
     +'<div class="sec-lbl">Violations ('+viols.length+')</div>'
-    +'<div id="viols-section">'+cards+'</div>'
-    +countyHtml(biz,score)
-    +renderIntelligenceSection(biz,_stats)
-    +timelineHtml(biz)
+    +severityLegendHtml()
+    +'<div id="viols-section">'+renderViolationCards(business,actions,partners)+'</div>'
+    +renderCountyContext(business,score)
+    +renderIntelligenceSection(business,_stats)
+    +renderWhatHappensNext(business)
     +'</div>';
-  renderCTA(biz);
+  renderCTA(business);
 }
 
 function renderNoViolations(biz){
@@ -955,7 +1071,7 @@ function renderPaywall(business,bizRecord){
 }
 
 async function showFreePreview(businessId){
-  renderReport(currentBusiness,_partners,_actions);
+  renderReport(currentBusiness,calcScoreWithActions(currentBusiness,_actions),_actions,_partners);
   var bid=esc(String(businessId||''));
   var banner=document.createElement('div');
   banner.style.cssText='background:#FFF5F5;border-bottom:2px solid #C0392B;'
@@ -1104,7 +1220,7 @@ async function init(){
     csDb.from('cs_businesses').update({last_seen_inspection_date:biz.last_inspection_date,updated_at:new Date().toISOString()}).eq('business_id',businessId).then(function(){});
   }
 
-  renderReport(biz,_partners,_actions);
+  renderReport(biz,calcScoreWithActions(biz,_actions),_actions,_partners);
 }
 
 init();
