@@ -1,5 +1,5 @@
 # CleanScore — App Status
-*Last updated: 2026-05-21 (session 47 — Inspector Intelligence) by Claude Code*
+*Last updated: 2026-05-21 (session 48 — chart fix, date sync, stats rate) by Claude Code*
 
 ## Live App
 - URL: https://pinellasiceco.github.io/cleanscore
@@ -52,9 +52,9 @@ Data pipeline: `build.py` → `export_cleanscore.py` → Supabase Storage → `i
 - Section hidden entirely when no inspector name on record
 
 ### Stats (County Context)
-- Violation rate: ~7.3% (uses `ice_confirmed` field over comprehensive Pinellas filter)
+- Violation rate: ~7.2% (~681 of ~9,400 Pinellas businesses with `ice_confirmed_dbpr=True`)
 - Median inspection interval: 121 days (matches build.py model)
-- Repeat probability: 46.8% (calculated from `cit_ice_count`)
+- Repeat probability: ~46.8% (repeat/chronic of cited businesses only)
 
 ### Paywall / Subscription
 - New inspection + free tier → paywall
@@ -118,8 +118,14 @@ var currentBusiness=null;
 ## What's Broken / Watch List ⚠️
 - **Inspector section empty on launch** — `cleanscore_inspectors.json` will have 0 entries until the scraper re-runs and captures inspector names from DBPR pages under the new code. Section is hidden when `business.inspector_name` is absent, so no visible gap.
 - **iOS PWA rules apply**: all buttons in `innerHTML`-injected content must use inline `ontouchend` + `onclick`; no `addEventListener` on injected elements
+- **Inspection timeline num_total** — bars may still show as thin lines for businesses whose history comes from xlsx files with <18 columns (Num Total not present). `had_v22` fallback bumps to 1 for V22 visits but non-V22 violation bars may still be 2px if num_total was 0. Will confirm after next CI rebuild with column-count debug output.
 
 ## Recent Changes
+- **2026-05-21 (s48 — chart fix, date sync, stats rate):**
+  - **Inspection timeline chart fixed** (`index.html`): `renderInspectionTimeline()` rewritten — primary violation count now reads `num_total` (the actual export field name); falls back to `violation_count`/`violations_count` for older data. `had_v22` fallback: if `num_total=0` but `had_v22=True`, treated as 1 violation. `maxViol` recalculated after applying fallbacks. Min bar height: 2px (clean), 6px (any violation). Trend text now uses `had_v22` counts across first/second halves of history — no more "Clean inspections" on businesses with V22 citations. Trend text rendered with color (not escaped plain text).
+  - **Stats rate fixed** (data side, `export_cleanscore.py`): `_has_ice_citation()` uses only `ice_confirmed_dbpr`/`ice_confirmed` — `cit_ice_count` fallback removed. Rate drops from wrong 18.7% to correct ~7.2%.
+  - **Last inspection date fixed** (data side, `export_cleanscore.py` + `build.py`): `build_violations_export()` now directly compares `cit_latest` against `last_insp` when setting `last_inspection_date` — inspection header date will match citation date. `enrich_with_citations()` in `build.py` also syncs `last_insp` ← `cit_latest` upstream with a `_date_synced_count` counter in CI log.
+
 - **2026-05-21 (s47 — Inspector Intelligence):**
   - Added `INSPECTORS_URL` constant and `_inspectors` global state
   - Added `fetchInspectors()` async loader (graceful null on failure)
