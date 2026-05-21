@@ -395,13 +395,20 @@ function renderInspectionTimeline(biz){
   var hist=biz.inspection_history;
   if(!hist||!hist.length)return'';
   var recent=hist.slice(-8);
-  var max=1;
-  recent.forEach(function(h){var vc=h.violation_count||h.violations_count||0;if(vc>max)max=vc;});
   var barW=28,barGap=6,chartH=60,labelH=18;
   var totalW=(barW+barGap)*recent.length-barGap;
+  // Resolve violation count per visit — num_total is the export field name;
+  // fall back to violation_count/violations_count for older data formats
+  var displayViolations=recent.map(function(h){
+    var v=h.num_total||h.violation_count||h.violations_count||0;
+    if(v===0&&h.had_v22)v=1;
+    return v;
+  });
+  var maxViol=Math.max.apply(null,displayViolations);
+  if(maxViol<1)maxViol=1;
   var bars=recent.map(function(h,i){
-    var vc=h.violation_count||h.violations_count||0;
-    var bh=vc>0?Math.max(4,Math.round((vc/max)*chartH)):4;
+    var vc=displayViolations[i];
+    var bh=vc===0?2:Math.max(6,Math.round((vc/maxViol)*(chartH-4)));
     var by=chartH-bh;
     var col=h.had_v22?'#C0392B':vc>0?'#E67E22':'#27AE60';
     var x=i*(barW+barGap);
@@ -409,17 +416,17 @@ function renderInspectionTimeline(biz){
     return'<rect x="'+x+'" y="'+by+'" width="'+barW+'" height="'+bh+'" rx="3" fill="'+col+'"/>'
       +'<text x="'+(x+barW/2)+'" y="'+(chartH+labelH-2)+'" text-anchor="middle" font-size="9" fill="#9E9E9E">'+esc(String(yr))+'</text>';
   }).join('');
-  var lastH=recent[recent.length-1];
-  var prevH=recent.length>1?recent[recent.length-2]:null;
-  var trend='';
-  if(lastH&&prevH){
-    var lvc=lastH.violation_count||lastH.violations_count||0;
-    var pvc=prevH.violation_count||prevH.violations_count||0;
-    if(lvc<pvc)trend='Violations trending down — good progress.';
-    else if(lvc>pvc)trend='Violations trending up — focus on corrections.';
-    else if(lvc===0)trend='Clean inspections across last two periods.';
-    else trend='Violation count unchanged from prior inspection.';
-  }
+  // Trend based on had_v22 across halves — num_total was 0 in older exports
+  var half=Math.floor(recent.length/2);
+  var firstHalf=recent.slice(0,half);
+  var secondHalf=recent.slice(half);
+  var olderV22=firstHalf.filter(function(h){return h.had_v22;}).length;
+  var recentV22=secondHalf.filter(function(h){return h.had_v22;}).length;
+  var trend='',trendColor='';
+  if(recentV22>olderV22){trend='&#x1F4C8; Ice machine citations increasing';trendColor='#C0392B';}
+  else if(recentV22<olderV22){trend='&#x1F4C9; Ice machine citations decreasing';trendColor='#27AE60';}
+  else if(recentV22>0){trend='&#x2192; Ongoing ice machine citation history';trendColor='#E67E22';}
+  else{trend='&#x2192; No ice machine citations in recent inspections';trendColor='#27AE60';}
   return'<div class="sec-lbl">Inspection History</div>'
     +'<div class="card">'
     +'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+totalW+' '+(chartH+labelH)+'" style="display:block;width:100%;max-height:80px">'
@@ -430,7 +437,7 @@ function renderInspectionTimeline(biz){
     +'<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--gray-text)"><span style="width:10px;height:10px;border-radius:2px;background:#E67E22;flex-shrink:0;display:inline-block"></span>Other Violations</div>'
     +'<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--gray-text)"><span style="width:10px;height:10px;border-radius:2px;background:#27AE60;flex-shrink:0;display:inline-block"></span>Clean</div>'
     +'</div>'
-    +(trend?'<div style="font-size:12px;color:var(--gray-text);margin-top:8px;font-style:italic">'+esc(trend)+'</div>':'')
+    +(trend?'<div style="font-size:12px;color:'+trendColor+';margin-top:8px;font-style:italic">'+trend+'</div>':'')
     +'</div>';
 }
 
