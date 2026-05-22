@@ -1,5 +1,5 @@
 # CleanScore — App Status
-*Last updated: 2026-05-21 (session 48 — chart fix, date sync, stats rate) by Claude Code*
+*Last updated: 2026-05-22 (session 49 — repeat probability fix) by Claude Code*
 
 ## Live App
 - URL: https://pinellasiceco.github.io/cleanscore
@@ -121,6 +121,9 @@ var currentBusiness=null;
 - **Inspection timeline num_total** — bars may still show as thin lines for businesses whose history comes from xlsx files with <18 columns (Num Total not present). `had_v22` fallback bumps to 1 for V22 visits but non-V22 violation bars may still be 2px if num_total was 0. Will confirm after next CI rebuild with column-count debug output.
 
 ## Recent Changes
+- **2026-05-22 (s49 — repeat probability fix):**
+  - **Repeat probability fix** (`export_cleanscore.py`): `once`/`repeat`/`chronic` thresholds changed — `once` is now `cit_ice_count <= 2`, `repeat` is `>= 3`, `chronic` is `>= 5`. A single inspection often generates 2 V22 codes (biofilm + scale in one visit), so the prior `>= 2` threshold overcounted repeat visits. Expected output: ~52% repeat probability vs prior 79.4%.
+
 - **2026-05-21 (s48 — chart fix, date sync, stats rate):**
   - **Inspection timeline chart fixed** (`index.html`): `renderInspectionTimeline()` rewritten — primary violation count now reads `num_total` (the actual export field name); falls back to `violation_count`/`violations_count` for older data. `had_v22` fallback: if `num_total=0` but `had_v22=True`, treated as 1 violation. `maxViol` recalculated after applying fallbacks. Min bar height: 2px (clean), 6px (any violation). Trend text now uses `had_v22` counts across first/second halves of history — no more "Clean inspections" on businesses with V22 citations. Trend text rendered with color (not escaped plain text).
   - **Stats rate fixed** (data side, `export_cleanscore.py`): `_has_ice_citation()` uses only `ice_confirmed_dbpr`/`ice_confirmed` — `cit_ice_count` fallback removed. Rate drops from wrong 18.7% to correct ~7.2%.
