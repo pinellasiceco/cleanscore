@@ -710,7 +710,6 @@ function renderReport(business,score,actions,partners){
     +'<div id="viols-section">'+renderViolationCards(business,actions,partners)+'</div>'
     +renderCountyContext(business,score)
     +renderIntelligenceSection(business,_stats)
-    +renderInspectorSection(business,_inspectors)
     +renderWhatHappensNext(business)
     +'</div>';
   renderCTA(business);
@@ -1273,7 +1272,6 @@ async function init(){
   }catch(e){renderError();return;}
   _violations=viols;_viols=viols;
   _partners=partners;
-  _inspectors=await fetchInspectors();
 
   var verifyToken=p.get('verify');
   var idP=p.get('id'),licP=p.get('license'),qP=p.get('q');
